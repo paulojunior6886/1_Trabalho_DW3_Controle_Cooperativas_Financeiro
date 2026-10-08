@@ -1,0 +1,70 @@
+services:
+  financeiro-postgres:
+    container_name: financeiro-postgres
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "${DB_FORWARD_PORT}:${DB_PORT}"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - financeiro-network
+
+  pg-admin-financeiro:
+    container_name: pg-admin-financeiro
+    image: dpage/pgadmin4:latest
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    ports:
+      - "${PGADMIN_FORWARD_PORT}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - financeiro-postgres
+    networks:
+      - financeiro-network
+
+    configs:
+      - source: pgadmin_config
+        target: /pgadmin4/servers.json
+        mode: 0444
+      - source: pgadmin_pass
+        target: /config/pgpass
+        uid: "5050"
+        gid: "5050"
+        mode: 0400
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+
+networks:
+  financeiro-network:
+    driver: bridge
+
+configs:
+  pgadmin_config:
+    content: |
+      {
+        "Servers": {
+          "1": {
+            "Name": "Financeiro Postgres",
+            "Group": "Servers",
+            "Host": "financeiro-postgres",
+            "Port": ${DB_PORT},
+            "MaintenanceDB": "${DB_NAME}",
+            "Username": "${DB_USER}",
+            "PassFile": "/config/pgpass",
+            "SSLMode": "prefer"
+          }
+        }
+      }
+  pgadmin_pass:
+    content: |
+      financeiro_postgres:${DB_PORT}:${DB_NAME}:${DB_USER}:${DB_PASSWORD}
